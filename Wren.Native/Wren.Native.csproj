@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Wren</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Wren</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Roy Ermers</Authors>
+    <Description>Wren scripting for .NET: bindings of the Wren C API and a source generator exposing C# types to Wren.</Description>
+    <PackageTags>wren;scripting;source-generator;interop</PackageTags>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)../artifacts/packages</PackageOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="runtimes/**" Pack="true" PackagePath="%(Identity)" />
+
+    <!-- Project references don't resolve runtimes/<rid>: copy the library for the building machine. -->
+    <None Include="runtimes/$(NETCoreSdkRuntimeIdentifier)/native/*" Link="%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" Pack="false" Visible="false" />
+
+    <None Update="build/Wren.props" Pack="true" PackagePath="build/Wren.props;buildTransitive/Wren.props" />
+
+    <None Include="../LICENSE" Pack="true" PackagePath="" Visible="false" />
+    <None Include="../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" Visible="false" />
+    <None Include="../README.md" Pack="true" PackagePath="" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Wren.SourceGenerator/Wren.SourceGenerator.csproj"
+                      ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="../Wren.SourceGenerator/bin/$(Configuration)/netstandard2.0/Wren.SourceGenerator.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+</Project>

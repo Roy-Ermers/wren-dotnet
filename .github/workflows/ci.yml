@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # The upstream Wren commit the native libraries are built from.
+  WREN_REPO: wren-lang/wren
+  WREN_COMMIT: 99d2f0b8fc2686134b32b18166e037639f7e9f2c
+  DOTNET_NOLOGO: true
+
+jobs:
+  native:
+    name: Native (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WREN_REPO }}
+          ref: ${{ env.WREN_COMMIT }}
+          path: wren
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+          build() {
+            mkdir -p out/$1/native
+            $2 -O2 -DNDEBUG -std=c99 -fPIC -shared -Iwren/src/include -Iwren/src/vm -Iwren/src/optional \
+              wren/src/vm/*.c wren/src/optional/*.c -lm -o out/$1/native/libwren.so
+          }
+          build linux-x64 gcc
+          build linux-arm64 aarch64-linux-gnu-gcc
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '12.0'
+        run: |
+          build() {
+            mkdir -p out/$1/native
+            clang -arch $2 -O2 -DNDEBUG -std=c99 -fPIC -dynamiclib -install_name @rpath/libwren.dylib \
+              -Iwren/src/include -Iwren/src/vm -Iwren/src/optional \
+              wren/src/vm/*.c wren/src/optional/*.c -o out/$1/native/libwren.dylib
+          }
+          build osx-arm64 arm64
+          build osx-x64 x86_64
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - name: Build (Windows x64)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          mkdir out\win-x64\native obj\x64
+          cl /nologo /O2 /DNDEBUG /LD /DWREN_API_DLLEXPORT /Iwren\src\include /Iwren\src\vm /Iwren\src\optional ^
+            wren\src\vm\*.c wren\src\optional\*.c /Foobj\x64\ /Feout\win-x64\native\wren.dll
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: amd64_arm64
+      - name: Build (Windows arm64)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          mkdir out\win-arm64\native obj\arm64
+          cl /nologo /O2 /DNDEBUG /LD /DWREN_API_DLLEXPORT /Iwren\src\include /Iwren\src\vm /Iwren\src\optional ^
+            wren\src\vm\*.c wren\src\optional\*.c /Foobj\arm64\ /Feout\win-arm64\native\wren.dll
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ runner.os }}
+          path: |
+            out/*/native/*.so
+            out/*/native/*.dylib
+            out/*/native/*.dll
+
+  test:
+    name: Test (${{ matrix.os }})
+    needs: native
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: Wren.Native/runtimes
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test --project Wren.Tests
+
+  pack:
+    name: Pack
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: Wren.Native/runtimes
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: >
+          dotnet pack Wren.Native -c Release
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: artifacts/packages/*.nupkg
+
+      - name: Publish to GitHub Packages
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >
+          dotnet nuget push artifacts/packages/*.nupkg
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          --api-key ${{ secrets.GITHUB_TOKEN }}
