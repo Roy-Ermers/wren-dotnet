@@ -14,6 +14,26 @@ env:
   DOTNET_NOLOGO: true
 
 jobs:
+  # On main: keeps a release PR (version bump + changelog) up to date. Merging it creates the tag and GitHub
+  # Release, and this run then publishes the package (releases created with GITHUB_TOKEN don't trigger workflows).
+  release:
+    name: Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   native:
     name: Native (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -107,10 +127,12 @@ jobs:
 
   pack:
     name: Pack
-    needs: test
+    needs: [test, release]
+    # The release job only runs on main; pack whenever the tests passed.
+    if: ${{ !cancelled() && needs.test.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -125,8 +147,12 @@ jobs:
 
       - name: Version
         id: version
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.created == 'true' && needs.release.outputs.version || '' }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           else
             echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
@@ -143,8 +169,14 @@ jobs:
           path: artifacts/packages/*.nupkg
 
       - name: Publish to GitHub Packages
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.release.outputs.created == 'true' || startsWith(github.ref, 'refs/tags/v')
         run: >
           dotnet nuget push artifacts/packages/*.nupkg
           --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
           --api-key ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attach to GitHub Release
+        if: needs.release.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ needs.release.outputs.tag }} artifacts/packages/*.nupkg
