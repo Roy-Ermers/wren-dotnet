@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <PackageId>Wren</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Authors>Roy Ermers</Authors>
     <Description>Wren scripting for .NET: bindings of the Wren C API and a source generator exposing C# types to Wren.</Description>
     <PackageTags>wren;scripting;source-generator;interop</PackageTags>
@@ -23,24 +23,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="runtimes/**" Pack="true" PackagePath="%(Identity)" />
+    <None Update="runtimes/**" Pack="true" PackagePath="%(Identity)"/>
 
     <!-- Project references don't resolve runtimes/<rid>: copy the library for the building machine. -->
-    <None Include="runtimes/$(NETCoreSdkRuntimeIdentifier)/native/*" Link="%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest" Pack="false" Visible="false" />
+    <None Include="runtimes/$(NETCoreSdkRuntimeIdentifier)/native/*" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Pack="false" Visible="false"/>
 
-    <None Update="build/Wren.props" Pack="true" PackagePath="build/Wren.props;buildTransitive/Wren.props" />
+    <None Update="build/Wren.props" Pack="true" PackagePath="build/Wren.props;buildTransitive/Wren.props"/>
 
-    <None Include="../LICENSE" Pack="true" PackagePath="" Visible="false" />
-    <None Include="../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" Visible="false" />
-    <None Include="../README.md" Pack="true" PackagePath="" Visible="false" />
+    <None Include="../LICENSE" Pack="true" PackagePath="" Visible="false"/>
+    <None Include="../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" Visible="false"/>
+    <None Include="../README.md" Pack="true" PackagePath="" Visible="false"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../Wren.SourceGenerator/Wren.SourceGenerator.csproj"
-                      ReferenceOutputAssembly="false" PrivateAssets="all" />
-    <None Include="../Wren.SourceGenerator/bin/$(Configuration)/netstandard2.0/Wren.SourceGenerator.dll"
-          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="../Wren.SourceGenerator/Wren.SourceGenerator.csproj" ReferenceOutputAssembly="false" PrivateAssets="all"/>
+    <None Include="../Wren.SourceGenerator/bin/$(Configuration)/netstandard2.0/Wren.SourceGenerator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
   </ItemGroup>
 
 </Project>
