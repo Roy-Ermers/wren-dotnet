@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using System.Text;
 
 using Wren.Native;
 
@@ -34,6 +35,36 @@ internal static unsafe class WrenVmCallbacks
         catch (Exception e)
         {
             Report("error", e);
+        }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    public static byte* ResolveModule(nint vm, byte* importer, byte* name)
+    {
+        try
+        {
+            var nameString = Utf8StringMarshaller.ConvertToManaged(name)!;
+            var resolved = WrenVm.FromNative(vm).Options.ResolveModule!(
+                Utf8StringMarshaller.ConvertToManaged(importer)!, nameString);
+
+            if (resolved is null)
+                return null;
+
+            // Wren keeps the name as-is when given back the same pointer, and otherwise frees the result with its
+            // default reallocator (C free), so it must come from the C heap.
+            if (resolved == nameString)
+                return name;
+
+            var length = Encoding.UTF8.GetByteCount(resolved);
+            var result = (byte*)NativeMemory.Alloc((nuint)length + 1);
+            Encoding.UTF8.GetBytes(resolved, new Span<byte>(result, length));
+            result[length] = 0;
+            return result;
+        }
+        catch (Exception e)
+        {
+            Report("resolveModule", e);
+            return null;
         }
     }
 

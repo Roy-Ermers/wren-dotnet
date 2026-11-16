@@ -9,9 +9,14 @@ internal sealed class TestVm : IDisposable
 
   private readonly StringBuilder _output = new();
 
-  public TestVm(Func<string, string?>? loadModule = null)
+  public TestVm(WrenLoadModuleHandler? loadModule = null, WrenResolveModuleHandler? resolveModule = null)
   {
-    Vm = new WrenVm(new WrenVmOptions { Write = text => _output.Append(text), LoadModule = loadModule });
+    Vm = new WrenVm(new WrenVmOptions
+    {
+      Write = text => _output.Append(text),
+      LoadModule = loadModule,
+      ResolveModule = resolveModule,
+    });
     Vm.AddBinding(WrenBinding.Instance);
   }
 

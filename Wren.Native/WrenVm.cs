@@ -27,6 +27,8 @@ public sealed unsafe class WrenVm : IDisposable
         WrenConfiguration config;
         WrenApi.InitConfiguration(&config);
 
+        if (Options.ResolveModule is not null)
+            config.ResolveModule = &WrenVmCallbacks.ResolveModule;
         config.LoadModule = &WrenVmCallbacks.LoadModule;
         config.BindForeignMethod = &WrenVmCallbacks.BindForeignMethod;
         config.BindForeignClass = &WrenVmCallbacks.BindForeignClass;

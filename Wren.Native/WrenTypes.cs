@@ -28,16 +28,31 @@ public sealed class WrenException(WrenInterpretResult result, IReadOnlyList<Wren
     }
 }
 
+/// <summary>Receives the output of <c>System.print</c> and <c>System.write</c>.</summary>
+public delegate void WrenWriteHandler(string text);
+
+/// <summary>Receives every error as it's reported, in addition to the thrown <see cref="WrenException"/>.</summary>
+public delegate void WrenErrorHandler(WrenError error);
+
+/// <summary>Returns the source of <paramref name="module"/>, or null if it doesn't exist.</summary>
+public delegate string? WrenLoadModuleHandler(string module);
+
+/// <summary>
+/// Called for every import of <paramref name="name"/> by <paramref name="importer"/>; returns the canonical module
+/// name, or null to fail the import.
+/// </summary>
+public delegate string? WrenResolveModuleHandler(string importer, string name);
+
 public sealed class WrenVmOptions
 {
-    /// <summary>Receives the output of <c>System.print</c> and <c>System.write</c>.</summary>
-    public Action<string>? Write { get; init; }
+    public WrenWriteHandler? Write { get; init; }
 
-    /// <summary>Receives every error as it's reported, in addition to the thrown <see cref="WrenException"/>.</summary>
-    public Action<WrenError>? Error { get; init; }
+    public WrenErrorHandler? Error { get; init; }
 
-    /// <summary>Returns the source of an imported module, or null. Consulted after the bindings.</summary>
-    public Func<string, string?>? LoadModule { get; init; }
+    /// <summary>Consulted after the bindings.</summary>
+    public WrenLoadModuleHandler? LoadModule { get; init; }
+
+    public WrenResolveModuleHandler? ResolveModule { get; init; }
 
     /// <summary>Bytes to allocate before the first garbage collection. Null uses Wren's default (10 MB).</summary>
     public nuint? InitialHeapSize { get; init; }
