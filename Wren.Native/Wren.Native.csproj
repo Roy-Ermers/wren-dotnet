@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <PackageId>Wren</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>Roy Ermers</Authors>
     <Description>Wren scripting for .NET: bindings of the Wren C API and a source generator exposing C# types to Wren.</Description>
     <PackageTags>wren;scripting;source-generator;interop</PackageTags>
